@@ -1,32 +1,25 @@
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.20.5 as builder
+FROM --platform=$BUILDPLATFORM golang:1.20.5 AS builder
 
 WORKDIR /workspace
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
 
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-#RUN go mod download
+# Copy go.mod and go.sum together and download dependencies only once
+COPY go.mod go.sum ./
 RUN GOPROXY=direct go mod download
 
-# Copy the go source
+# Copy the Go source code
 COPY cmd/aws-application-networking-k8s/main.go main.go
 COPY pkg/ pkg/
-COPY scripts scripts
+COPY scripts/ scripts/
 
-ARG TARGETOS
-ARG TARGETARCH
+# Build the binary with static linking for target OS and architecture
+RUN CGO_ENABLED=0 GOOS=$(echo $TARGETOS) GOARCH=$(echo $TARGETARCH) go build -a -o /manager main.go
 
-# Build
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -o manager main.go
-
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
+# Use a minimal base image
 FROM --platform=$TARGETPLATFORM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /manager /manager
+
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
