@@ -5,6 +5,10 @@ WORKDIR /workspace
 
 # Copy go.mod and go.sum together and download dependencies only once
 COPY go.mod go.sum ./
+
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+#RUN go mod download
 RUN GOPROXY=direct go mod download
 
 # Copy the Go source code
